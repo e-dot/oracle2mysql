@@ -16,11 +16,11 @@ Small data transfer script - from Oracle to MySQL
 
 ### Install nodejs
 
-    [https://nodejs.org/]
+* [https://nodejs.org/]
 
 ### Install Git
 
-    [https://git-scm.com/downloads]
+* [https://git-scm.com/downloads]
 
 ### Checkout code
 
