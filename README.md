@@ -17,8 +17,11 @@ Small data transfer script - from Oracle to MySQL
 * Install nodejs [https://nodejs.org/]
 * Install Git
 * Checkout code
+
     git clone https://github.com/e-dot/oracle2mysql.git
+
 * Install packages
+
     cd oracle2mysql
     cd setup
     npm install
