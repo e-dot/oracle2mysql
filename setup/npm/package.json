@@ -1,0 +1,25 @@
+{
+  "name": "oracle2mysql",
+  "version": "1.0.0",
+  "description": "oracle2mysql - Copyright Replay SDK (www.replay-sdk.com)",
+  "license": "LicenseRef-LICENSE",
+  "private": true,
+  "dependencies": {
+    "mysql": ">= 2.12.0",
+    "node-oracledb": ">= 2.1",
+    "xml2js": ">= 0.4.17",
+    "async": ">= 2.3.0",
+    "moment": ">= 2.10.0",
+    "tmp": ">= 0.0.31",
+  },
+  "devDependencies": {
+    "standard": "*"
+  },
+  "scripts": {
+    "test": "standard && node my-tests.js"
+  },
+  "standard": {
+    "globals": [
+    ]
+  }
+}
