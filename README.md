@@ -2,6 +2,13 @@
 
 Small data transfer script - from Oracle to MySQL
 
+## Overview
+
+This simple script converts data from an Oracle database to a MySQL database :
+* List all tables using a connection to the Oracle database
+* Maps data types to their MySQL equivalent
+* Create and populate data to a MySQL connection
+
 ## Features
 
 * Database requirements:
@@ -12,6 +19,7 @@ Small data transfer script - from Oracle to MySQL
 * Command line parameters:
   * TODO
 
+  
 ## Setup
 
 ### Install nodejs
