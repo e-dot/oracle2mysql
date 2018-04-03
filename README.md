@@ -45,6 +45,10 @@ This simple script converts data from an Oracle database to a MySQL database :
     npm install
 
 ## Usage
+    SET NODE_PATH=...\oracle2mysql\setup\node_modules
+    SET NODE_ORACLEDB_USER=... [DEFAULT:system]
+    SET NODE_ORACLEDB_PASSWORD=... [DEFAULT:empty]
+    SET NODE_ORACLEDB_CONNECTIONSTRING=... [DEFAULT:localhost/orcl]
     cd ..
     node bin/oracle2mysql.js [options]
 

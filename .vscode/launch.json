@@ -1,0 +1,29 @@
+{
+    // Utilisez IntelliSense pour en savoir plus sur les attributs possibles.
+    // Pointez pour afficher la description des attributs existants.
+    // Pour plus d'informations, visitez : https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Lancer le programme",
+            "program": "${file}",
+            "args": [
+                "-oracle",
+                "",
+                "-mysql", 
+                "",
+                "-list_request",
+                "SELECT * FROM dba_tables WHERE OWNER NOT IN ('SYS', 'SYSTEM', 'XDB', 'EXFSYS', 'SYSMAN', 'BO', 'OUTLN', 'DBSNMP', 'APPQOSSYS', 'WMSYS', 'CTXSYS', 'ORDDATA', 'MDSYS', 'OLAPSYS', 'ORDSYS', 'FLOWS_FILES', 'OWBSYS') AND OWNER NOT LIKE 'APEX_%'"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/bin/*.js",
+                "${workspaceFolder}/setup/node_modules/**/*.js"
+            ], 
+            "env": {
+                "NODE_PATH": "${workspaceFolder}\\setup\\node_modules"
+            }
+        }
+    ]
+}
