@@ -22,6 +22,10 @@ Small data transfer script - from Oracle to MySQL
 
 * [https://git-scm.com/downloads]
 
+### Install Oracle Instant Client
+
+* [http://www.oracle.com/technetwork/topics/winx64soft-089540.html]
+
 ### Checkout code
 
     git clone https://github.com/e-dot/oracle2mysql.git
@@ -35,3 +39,7 @@ Small data transfer script - from Oracle to MySQL
 ## Usage
     cd ..
     node bin/oracle2mysql.js [options]
+
+### Command Line Options
+
+    TODO

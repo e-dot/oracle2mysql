@@ -6,7 +6,7 @@
   "private": true,
   "dependencies": {
     "mysql": ">= 2.12.0",
-    "node-oracledb": ">= 2.1",
+    "oracledb": ">= 2.2.0",
     "xml2js": ">= 0.4.17",
     "async": ">= 2.3.0",
     "moment": ">= 2.10.0",
@@ -19,7 +19,6 @@
     "test": "standard && node my-tests.js"
   },
   "standard": {
-    "globals": [
-    ]
+    "globals": []
   }
 }
