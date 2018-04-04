@@ -54,4 +54,22 @@ This simple script converts data from an Oracle database to a MySQL database :
 
 ### Command Line Options
 
-    TODO
+* -list_request : define the Oracle query to list all SQL tables for migration (defaults to <code>SELECT * FROM dba_tables</code>)
+* -schema_map : define the schema mapping from Oracle (owner) to MySQL (database) ; defaults to "*:*" (maps owner to database as-is)
+  * -schema_map "*:MYBASE" : replace owner by 'mybase' (e.g. table OWNER.NAME is migrated into MYBASE.NAME)
+* -timeout : define the query timeout, in seconds (defaults to 600 s i.e. 10 minutes)
+* -nodrop : if set, no "DROP TABLE" will be executed during migration (you can pre-fill tables with specific values, if needed)
+* -nocreate : if set, no "CREATE TABLE" will be executed during migration (you have to manually create tables first)
+* -truncate : if set, a SQL command "TRUNCATE TABLE" will be execute during migration of every table (emptying the table)
+* -engine: if set, all "CREATE TABLE" commands will use this ENGINE (defaults to "MyISAM")
+
+## References
+
+### Oracle Data Types
+
+* [https://docs.oracle.com/cd/B28359_01/server.111/b28318/datatype.htm]
+
+### MySQL Data Types
+
+* [https://dev.mysql.com/doc/refman/5.5/en/data-types.html]
+
