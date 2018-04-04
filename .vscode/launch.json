@@ -10,12 +10,11 @@
             "name": "Lancer le programme",
             "program": "${file}",
             "args": [
-                "-oracle",
-                "",
-                "-mysql", 
-                "",
                 "-list_request",
-                "SELECT * FROM dba_tables WHERE OWNER NOT IN ('SYS', 'SYSTEM', 'XDB', 'EXFSYS', 'SYSMAN', 'BO', 'OUTLN', 'DBSNMP', 'APPQOSSYS', 'WMSYS', 'CTXSYS', 'ORDDATA', 'MDSYS', 'OLAPSYS', 'ORDSYS', 'FLOWS_FILES', 'OWBSYS') AND OWNER NOT LIKE 'APEX_%'"
+                "SELECT * FROM dba_tables WHERE OWNER = 'GREFFIER'",
+                "-schema_map",
+                "*:gagi2",
+                "-truncate"
             ],
             "outFiles": [
                 "${workspaceFolder}/bin/*.js",

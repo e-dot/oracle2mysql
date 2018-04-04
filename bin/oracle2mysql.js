@@ -5,6 +5,11 @@
 var strSQLOracleListTables = 'SELECT * FROM dba_tables'
 var objSQLSchemaMap = {in:'*', out:'*'}
 var arrTables = []
+var intTimeout = 600 /* 10 minutes */
+var blnDrop = true
+var blnCreate = true
+var blnTruncate = false
+var strMySQLTableEngine = 'MyISAM'
 
 // Process command line arguments
 for (var intIndex = 2; intIndex < process.argv.length; intIndex++) {
@@ -18,7 +23,18 @@ for (var intIndex = 2; intIndex < process.argv.length; intIndex++) {
     var arrSQLSchemaMap = process.argv[++intIndex].split(':')
     objSQLSchemaMap.in = arrSQLSchemaMap[0].toUpperCase()
     objSQLSchemaMap.out = arrSQLSchemaMap[1].toUpperCase()
+  } else if (strValue === '-timeout') {
+    intTimeout = parseInt(process.argv[++intIndex], 10)
+  } else if (strValue === '-nodrop') {
+    blnDrop = false
+  } else if (strValue === '-nocreate') {
+    blnCreate = false
+  } else if (strValue === '-truncate') {
+    blnTruncate = true
+  } else if (strValue === '-engine') {
+    strMySQLTableEngine = process.argv[++intIndex]
   }
+  
 }
 
 var mysql = require('mysql')
@@ -31,7 +47,8 @@ var mysqlDBConnectionPool = mysql.createPool({
   host: mysqlDBConfig.host,
   user: mysqlDBConfig.user,
   password: mysqlDBConfig.password,
-  database: mysqlDBConfig.schema
+  database: (objSQLSchemaMap.out === '*' ? mysqlDBConfig.schema : objSQLSchemaMap.out),
+  multipleStatements: true
 })
 console.log('Processing from Oracle 2 MySQL...')
 console.log('Connecting to Oracle database...')
@@ -41,8 +58,65 @@ databaseLoop(function (err) {
     console.error(err.message)
     process.exit(1)
   }
-  console.log(JSON.stringify(arrTables))
-  process.exit(0)
+  for (var intTable = 0; intTable < arrTables.length; intTable++) {
+    var objTable = arrTables[intTable] // {table_owner: strTableOwner, table_name: strTableName, table_space: strTablespace, mysql_schema: strMySQLSchema}
+    // .columns.push({ id:intColumnID, name:strColumnName, type:strColumnType, default:objColumnDefaultValue, nullable:blnColumnNullable })
+    var strSQLDropTable = 'DROP TABLE IF EXISTS `' + objTable.mysql_schema + '`.`' + objTable.table_name + '`\n;\n'
+    var strSQLCreateTable = 'CREATE TABLE IF NOT EXISTS `' + objTable.mysql_schema + '`.`' + objTable.table_name + '` ('
+      + objTable.columns.map(function (objColumn, intIndex, arrValues) {
+        return ('\n  `' + objColumn.name + '` ' 
+          + databaseMapDataType(objColumn.type, objColumn.data_length, objColumn.data_precision, objColumn.data_scale) 
+          + (objColumn.nullable ? ' NULL' : ' NOT NULL') 
+          + databaseMapDefault(objColumn)
+        )
+      })
+      + '\n) ENGINE=' + strMySQLTableEngine + ' COMMENT \'oracle2mysql.js : ' + objTable.table_owner + '.'+ objTable.table_name + ' [' + objTable.table_space + ']\'\n;\n'
+    var strSQLTruncateTable = 'TRUNCATE TABLE `' + objTable.mysql_schema + '`.`' + objTable.table_name + '`\n;\n'
+    // Full SQL request with drop/create/truncate, depending on command line parameters
+    var strSQLDropCreateTruncateTable = ''
+    if (blnDrop) {
+      strSQLDropCreateTruncateTable += strSQLDropTable
+    }
+    if (blnCreate) {
+      strSQLDropCreateTruncateTable += strSQLCreateTable
+    }
+    if (blnTruncate) {
+      strSQLDropCreateTruncateTable += strSQLTruncateTable
+    }
+    // console.log('#' + intTable.toString(10) + ' SQL='+strSQLDropCreateTruncateTable)
+    var arrSQLColumns = objTable.columns.map(function (objColumn, intIndex, arrValues) {
+      return (objColumn.name)
+    })
+    var strSQLColumns = arrSQLColumns.join(', ')
+    var strSQLSelectTable = 'SELECT '
+      + strSQLColumns
+      + ' FROM ' + objTable.table_owner + '.' + objTable.table_name
+    var strSQLInsertIntoTable = 'INSERT INTO ' + objTable.mysql_schema + '.' + objTable.table_name + ' (\n  ' + strSQLColumns + '\n)\n'
+    objTable.sql_create = strSQLDropCreateTruncateTable
+    objTable.sql_select = strSQLSelectTable
+    objTable.sql_insert = strSQLInsertIntoTable
+  } // for
+
+  // Create all tables
+  async.eachOfLimit(arrTables, 3 /* limit */, databaseCreateTable /* iteratee */, function (err) {
+    if (err) {
+      throw err
+    }
+    console.log('MySQL: All tables created.')
+
+    // Loop on all tables data (sql_select)
+    async.eachOfLimit(arrTables, 1 /* limit */, databaseSelectInsertTable /* iteratee */, function (err) {
+      if (err) {
+        throw err
+      }
+      console.log('MySQL: All tables filled with data.')
+  
+      console.log('End.')
+      process.exit(0)
+    } /* callbackopt */)
+    
+  } /* callbackopt */)
+
 })
 
 function oracleDBConnect (cb) {
@@ -61,7 +135,7 @@ function oracleDBRelease (objSourceConnection) {
 }
 
 function databaseLoop (cb) {
-  console.log('Listing Oracle tables with request: ' + strSQLOracleListTables)
+  console.log('Oracle: ' + strSQLOracleListTables)
   oracleDB.createPool (
     {
       user: oracleDBConfig.user,
@@ -128,7 +202,6 @@ function databaseMapTable(objTable, intTableKey, cb) {
   var strTableName = objTable.table_name
   var strTablespace = objTable.table_space
   if (objSQLSchemaMap.in === '*' || objSQLSchemaMap.in === strTableOwner) {
-    console.log('#' + intTableKey.toString(10) + ' ' + strTableOwner + '.' + strTableName + ' [' + strTablespace + '] => ' + objTable.mysql_schema + '.' + strTableName)
     oracleDBConnect(function (err, objSourceConnection) {
       if (err) {
         throw err
@@ -163,8 +236,16 @@ function databaseMapTable(objTable, intTableKey, cb) {
             var strColumnType = result.rows[intCols].DATA_TYPE
             var objColumnDefaultValue = result.rows[intCols].DATA_DEFAULT
             var blnColumnNullable = result.rows[intCols].NULLABLE !== 'N'
-            console.log('  COLUMN #' + intCols.toString(10) + ' "' + strColumnName + '"[' + strColumnType + ']')
-            objTable.columns.push({ id:intColumnID, name:strColumnName, type:strColumnType, default:objColumnDefaultValue, nullable:blnColumnNullable })
+            objTable.columns.push({
+              id:intColumnID, 
+              name:strColumnName, 
+              type:strColumnType, 
+              data_length: result.rows[intCols].DATA_LENGTH, 
+              data_precision: result.rows[intCols].DATA_PRECISION,
+              data_scale: result.rows[intCols].DATA_SCALE,
+              default:objColumnDefaultValue, 
+              nullable:blnColumnNullable 
+            })
           }
           oracleDBRelease(objSourceConnection)
           return (cb())
@@ -173,17 +254,164 @@ function databaseMapTable(objTable, intTableKey, cb) {
     })
   }
 }
-/*
-    console.log('Connecting to MySQL database...')
-    mysqlDBConnectionPool.getConnection(function (err, objDestinationConnection) {
-      if (err) throw err
-      console.log('Connected.')
-      objDestinationConnection.query('CREATE TABLE IF NOT EXISTS ', function (error, results, fields) {
-        // Release
-        objDestinationConnection.release()
-        // Handle error after the release.
-        if (error) throw error
-        // Don't use the objDestinationConnection here, it has been returned to the pool.
+
+function databaseMapDataType(strSourceDataType, intDataLength, intDataPrecision, intDataScale) {
+  var strDestinationDataType = strSourceDataType
+  switch (strSourceDataType) {
+    case 'VARCHAR2':
+      strDestinationDataType = 'VARCHAR(' + intDataLength + ')'
+      break
+    case 'NUMBER':
+      if (intDataScale > 0) {
+        strDestinationDataType = 'DECIMAL(' + intDataLength.toString(10) + ',' + intDataScale.toString(10) + ')'
+      } else { 
+        strDestinationDataType = 'INTEGER'
+      }
+      break
+    case 'CLOB':
+      strDestinationDataType = 'LONGTEXT'
+      break
+    case 'BLOB':
+      strDestinationDataType = 'LONGBLOB'
+      break
+  }
+  return(strDestinationDataType)
+}
+
+function databaseMapDefault(objColumn) {
+  var strSQLDefault = ''
+  if (objColumn.default !== null) {
+    strSQLDefault = ' DEFAULT ' + objColumn.default
+    if (objColumn.default.match(/^SYSDATE/)) {
+      if (objColumn.type === 'DATETIME' || objColumn.type === 'TIMESTAMP') {
+        strSQLDefault = ' DEFAULT CURRENT_TIMESTAMP'
+      } else {
+        // No direct translation from Oracle to MySQL: drop it
+        strSQLDefault = ''
+      }
+    }
+  }
+  
+  return (strSQLDefault)
+}
+
+function databaseCreateTable(objTable, intTable, cb) {
+    mysqlDBConnectionPool.getConnection(function (err, objMySQLConnection) {
+      if (err) {
+        throw err
+      }
+      console.log('MySQL: ' + objTable.sql_create)
+      objMySQLConnection.query(objTable.sql_create, null, function (err, results, fields) {
+        objMySQLConnection.release()
+        if (err) {
+          throw err
+        }
+        return cb()
       })
     })
-*/
+}
+
+function databaseSelectInsertTable(objTable, intTable, cb) {
+  oracleDBConnect(function (err, objSourceConnection) {
+    if (err) {
+      throw err
+    }
+    console.log('Oracle:' + objTable.sql_select)
+    objSourceConnection.execute(
+      // Loop on all rows in source table
+      objTable.sql_select,
+  
+      // Parameters: none
+      {
+      },
+  
+      // Options
+      {
+        maxRows: 0,                  // No limit
+        outFormat: oracleDB.OBJECT,  // query result format
+        extendedMetaData: false,     // no extra metadata
+        resultSet: true              // return a Result Set
+      },
+  
+      // Callback function
+      function (err, result) {
+        if (err) {
+          oracleDBRelease(objSourceConnection)
+          throw err
+        }
+        var numRows = 100  // number of rows to return from each call to getRows()
+        databaseSelectInsertFetchRows(objSourceConnection, result.resultSet, numRows, objTable, intTable, cb)
+      }
+    )
+  })
+}
+
+function databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, objTable, intTable, cb) {
+  resultSet.getRows( // get numRows rows
+    numRows,
+    function (err, rows) {
+      if (err) {
+        resultSet.close()
+        oracleDBRelease(objSourceConnection)
+        throw err
+    } else if (rows.length > 0) {     // got some rows
+        databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, cb)
+        if (rows.length === numRows) {
+          // might be more rows
+          databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, objTable, intTable, cb)
+        } else {
+          // got fewer rows than requested so must be at end
+          databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, cb)
+          // close the ResultSet and release the connection
+          resultSet.close()
+          oracleDBRelease(objSourceConnection)
+          // Execute callback/end of loop
+          return cb()
+        }                         
+    } else {                        
+        // else no rows
+        // close the ResultSet and release the connection
+        resultSet.close()
+        oracleDBRelease(objSourceConnection)
+        // Execute callback/end of loop
+        return cb()
+    }
+  })
+}
+
+function databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, cb) {
+  var arrRows = []
+  for (var intRows = 0; intRows < rows.length; intRows++) {
+    var objRow = rows[intRows]
+    arrCols = []
+    for (var intCols = 0; intCols < objTable.columns.length; intCols++) {
+      var strColumnName = objTable.columns[intCols].name
+      var objColumnValue = objRow[strColumnName]
+      arrCols.push(objColumnValue)
+    }
+    arrRows.push(arrCols)
+  }
+  if (arrRows.length > 0) {
+    mysqlDBConnectionPool.getConnection(function (err, objMySQLConnection) {
+      if (err) {
+        throw err
+      }
+      var arrSQLValues = arrRows.map(function (arrCols, intRow, arrRows) {
+        // Simply concatenate column values between parenthesis
+        return ('(' + arrCols.map(function (objColumnValue, intColumn, arrCols) {
+          // Simply encode the SQL value
+          return (objMySQLConnection.escape(objColumnValue))
+        }) + ')')
+      })
+      var strSQLInsertValues = objTable.sql_insert + ' VALUES \n'
+        + arrSQLValues.join(', \n') + '\n'
+      console.log('MySQL[' + arrRows.length + ']: ' + strSQLInsertValues)
+      objMySQLConnection.query({sql:strSQLInsertValues, timeout:intTimeout}, null, function (err, results, fields) {
+        objMySQLConnection.release()
+        if (err) {
+          throw err
+        }
+      })
+    })
+  }
+}
