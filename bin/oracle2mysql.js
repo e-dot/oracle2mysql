@@ -3,7 +3,7 @@
 //
 
 var strSQLOracleListTables = 'SELECT * FROM dba_tables'
-var objSQLSchemaMap = {in:'*', out:'*'}
+var objSQLSchemaMap = {in: '*', out: '*'}
 var arrTables = []
 var intTimeout = 600 /* 10 minutes */
 var blnDrop = true
@@ -34,7 +34,6 @@ for (var intIndex = 2; intIndex < process.argv.length; intIndex++) {
   } else if (strValue === '-engine') {
     strMySQLTableEngine = process.argv[++intIndex]
   }
-  
 }
 
 var mysql = require('mysql')
@@ -62,15 +61,15 @@ databaseLoop(function (err) {
     var objTable = arrTables[intTable] // {table_owner: strTableOwner, table_name: strTableName, table_space: strTablespace, mysql_schema: strMySQLSchema}
     // .columns.push({ id:intColumnID, name:strColumnName, type:strColumnType, default:objColumnDefaultValue, nullable:blnColumnNullable })
     var strSQLDropTable = 'DROP TABLE IF EXISTS `' + objTable.mysql_schema + '`.`' + objTable.table_name + '`\n;\n'
-    var strSQLCreateTable = 'CREATE TABLE IF NOT EXISTS `' + objTable.mysql_schema + '`.`' + objTable.table_name + '` ('
-      + objTable.columns.map(function (objColumn, intIndex, arrValues) {
-        return ('\n  `' + objColumn.name + '` ' 
-          + databaseMapDataType(objColumn.type, objColumn.data_length, objColumn.data_precision, objColumn.data_scale) 
-          + (objColumn.nullable ? ' NULL' : ' NOT NULL') 
-          + databaseMapDefault(objColumn)
+    var strSQLCreateTable = 'CREATE TABLE IF NOT EXISTS `' + objTable.mysql_schema + '`.`' + objTable.table_name +
+      '` (' + objTable.columns.map(function (objColumn, intIndex, arrValues) {
+        return ('\n  `' + objColumn.name + '` ' +
+          databaseMapDataType(objColumn.type, objColumn.data_length, objColumn.data_precision, objColumn.data_scale) +
+          (objColumn.nullable ? ' NULL' : ' NOT NULL') +
+          databaseMapDefault(objColumn)
         )
-      })
-      + '\n) ENGINE=' + strMySQLTableEngine + ' COMMENT \'oracle2mysql.js : ' + objTable.table_owner + '.'+ objTable.table_name + ' [' + objTable.table_space + ']\'\n;\n'
+      }) +
+      '\n) ENGINE=' + strMySQLTableEngine + ' COMMENT \'oracle2mysql.js : ' + objTable.table_owner + '.' + objTable.table_name + ' [' + objTable.table_space + ']\'\n;\n'
     var strSQLTruncateTable = 'TRUNCATE TABLE `' + objTable.mysql_schema + '`.`' + objTable.table_name + '`\n;\n'
     // Full SQL request with drop/create/truncate, depending on command line parameters
     var strSQLDropCreateTruncateTable = ''
@@ -88,9 +87,9 @@ databaseLoop(function (err) {
       return (objColumn.name)
     })
     var strSQLColumns = arrSQLColumns.join(', ')
-    var strSQLSelectTable = 'SELECT '
-      + strSQLColumns
-      + ' FROM ' + objTable.table_owner + '.' + objTable.table_name
+    var strSQLSelectTable = 'SELECT ' +
+      strSQLColumns +
+      ' FROM ' + objTable.table_owner + '.' + objTable.table_name
     var strSQLInsertIntoTable = 'INSERT INTO ' + objTable.mysql_schema + '.' + objTable.table_name + ' (\n  ' + strSQLColumns + '\n)\n'
     objTable.sql_create = strSQLDropCreateTruncateTable
     objTable.sql_select = strSQLSelectTable
@@ -110,17 +109,15 @@ databaseLoop(function (err) {
         throw err
       }
       console.log('MySQL: All tables filled with data.')
-  
+
       console.log('End.')
       process.exit(0)
     } /* callbackopt */)
-    
   } /* callbackopt */)
-
 })
 
 function oracleDBConnect (cb) {
-  var pool = oracleDB.getPool();
+  var pool = oracleDB.getPool()
   pool.getConnection(cb)
 }
 
@@ -136,15 +133,18 @@ function oracleDBRelease (objSourceConnection) {
 
 function databaseLoop (cb) {
   console.log('Oracle: ' + strSQLOracleListTables)
-  oracleDB.createPool (
+  oracleDB.createPool(
     {
       user: oracleDBConfig.user,
       password: oracleDBConfig.password,
       connectString: oracleDBConfig.connectString,
       privilege: oracleDB.SYSDBA
     },
-    function(err, pool) {
-      pool.getConnection (
+    function (err, pool) {
+      if (err) {
+        throw err
+      }
+      pool.getConnection(
         function (err, objSourceConnection) {
           if (err) {
             console.error(err.message)
@@ -189,18 +189,17 @@ function databaseLoop (cb) {
               oracleDBRelease(objSourceConnection)
 
               async.eachOfLimit(arrTables, 3 /* limit */, databaseMapTable /* iteratee */, cb /* callbackopt */)
-
             }
           )
         }
       )
-  })
+    }
+  )
 }
 
-function databaseMapTable(objTable, intTableKey, cb) {
+function databaseMapTable (objTable, intTableKey, cb) {
   var strTableOwner = objTable.table_owner
   var strTableName = objTable.table_name
-  var strTablespace = objTable.table_space
   if (objSQLSchemaMap.in === '*' || objSQLSchemaMap.in === strTableOwner) {
     oracleDBConnect(function (err, objSourceConnection) {
       if (err) {
@@ -209,20 +208,20 @@ function databaseMapTable(objTable, intTableKey, cb) {
       objSourceConnection.execute(
         // To get a table definition, we use a SELECT from the ALL_TAB_COLUMNS special table
         'SELECT * FROM ALL_TAB_COLUMNS WHERE OWNER=:table_owner AND TABLE_NAME = :table_name ORDER BY COLUMN_ID',
-    
+
         // Parameters: table owner and table name
         {
           table_owner: { dir: oracleDB.BIND_IN, val: strTableOwner, type: oracleDB.STRING },
           table_name: { dir: oracleDB.BIND_IN, val: strTableName, type: oracleDB.STRING }
         },
-    
+
         {
           maxRows: 1000,
           outFormat: oracleDB.OBJECT,  // query result format
           extendedMetaData: false,     // no extra metadata
           fetchArraySize: 1000         // internal buffer allocation size for tuning
         },
-    
+
         // Callback function
         function (err, result) {
           if (err) {
@@ -237,14 +236,14 @@ function databaseMapTable(objTable, intTableKey, cb) {
             var objColumnDefaultValue = result.rows[intCols].DATA_DEFAULT
             var blnColumnNullable = result.rows[intCols].NULLABLE !== 'N'
             objTable.columns.push({
-              id:intColumnID, 
-              name:strColumnName, 
-              type:strColumnType, 
-              data_length: result.rows[intCols].DATA_LENGTH, 
+              id: intColumnID,
+              name: strColumnName,
+              type: strColumnType,
+              data_length: result.rows[intCols].DATA_LENGTH,
               data_precision: result.rows[intCols].DATA_PRECISION,
               data_scale: result.rows[intCols].DATA_SCALE,
-              default:objColumnDefaultValue, 
-              nullable:blnColumnNullable 
+              default: objColumnDefaultValue,
+              nullable: blnColumnNullable
             })
           }
           oracleDBRelease(objSourceConnection)
@@ -255,7 +254,7 @@ function databaseMapTable(objTable, intTableKey, cb) {
   }
 }
 
-function databaseMapDataType(strSourceDataType, intDataLength, intDataPrecision, intDataScale) {
+function databaseMapDataType (strSourceDataType, intDataLength, intDataPrecision, intDataScale) {
   var strDestinationDataType = strSourceDataType
   switch (strSourceDataType) {
     case 'VARCHAR2':
@@ -264,7 +263,7 @@ function databaseMapDataType(strSourceDataType, intDataLength, intDataPrecision,
     case 'NUMBER':
       if (intDataScale > 0) {
         strDestinationDataType = 'DECIMAL(' + intDataLength.toString(10) + ',' + intDataScale.toString(10) + ')'
-      } else { 
+      } else {
         strDestinationDataType = 'INTEGER'
       }
       break
@@ -275,10 +274,10 @@ function databaseMapDataType(strSourceDataType, intDataLength, intDataPrecision,
       strDestinationDataType = 'LONGBLOB'
       break
   }
-  return(strDestinationDataType)
+  return (strDestinationDataType)
 }
 
-function databaseMapDefault(objColumn) {
+function databaseMapDefault (objColumn) {
   var strSQLDefault = ''
   if (objColumn.default !== null) {
     strSQLDefault = ' DEFAULT ' + objColumn.default
@@ -291,27 +290,27 @@ function databaseMapDefault(objColumn) {
       }
     }
   }
-  
+
   return (strSQLDefault)
 }
 
-function databaseCreateTable(objTable, intTable, cb) {
-    mysqlDBConnectionPool.getConnection(function (err, objMySQLConnection) {
+function databaseCreateTable (objTable, intTable, cb) {
+  mysqlDBConnectionPool.getConnection(function (err, objMySQLConnection) {
+    if (err) {
+      throw err
+    }
+    console.log('MySQL: ' + objTable.sql_create)
+    objMySQLConnection.query(objTable.sql_create, null, function (err, results, fields) {
+      objMySQLConnection.release()
       if (err) {
         throw err
       }
-      console.log('MySQL: ' + objTable.sql_create)
-      objMySQLConnection.query(objTable.sql_create, null, function (err, results, fields) {
-        objMySQLConnection.release()
-        if (err) {
-          throw err
-        }
-        return cb()
-      })
+      return cb()
     })
+  })
 }
 
-function databaseSelectInsertTable(objTable, intTable, cb) {
+function databaseSelectInsertTable (objTable, intTable, cb) {
   oracleDBConnect(function (err, objSourceConnection) {
     if (err) {
       throw err
@@ -320,11 +319,11 @@ function databaseSelectInsertTable(objTable, intTable, cb) {
     objSourceConnection.execute(
       // Loop on all rows in source table
       objTable.sql_select,
-  
+
       // Parameters: none
       {
       },
-  
+
       // Options
       {
         maxRows: 0,                  // No limit
@@ -332,7 +331,7 @@ function databaseSelectInsertTable(objTable, intTable, cb) {
         extendedMetaData: false,     // no extra metadata
         resultSet: true              // return a Result Set
       },
-  
+
       // Callback function
       function (err, result) {
         if (err) {
@@ -346,7 +345,7 @@ function databaseSelectInsertTable(objTable, intTable, cb) {
   })
 }
 
-function databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, objTable, intTable, cb) {
+function databaseSelectInsertFetchRows (objSourceConnection, resultSet, numRows, objTable, intTable, cb) {
   resultSet.getRows( // get numRows rows
     numRows,
     function (err, rows) {
@@ -354,7 +353,7 @@ function databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, 
         resultSet.close()
         oracleDBRelease(objSourceConnection)
         throw err
-    } else if (rows.length > 0) {     // got some rows
+      } else if (rows.length > 0) {     // got some rows
         databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, cb)
         if (rows.length === numRows) {
           // might be more rows
@@ -367,23 +366,24 @@ function databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, 
           oracleDBRelease(objSourceConnection)
           // Execute callback/end of loop
           return cb()
-        }                         
-    } else {                        
+        }
+      } else {
         // else no rows
         // close the ResultSet and release the connection
         resultSet.close()
         oracleDBRelease(objSourceConnection)
         // Execute callback/end of loop
         return cb()
+      }
     }
-  })
+  )
 }
 
-function databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, cb) {
+function databaseSelectInsertProcessRows (objSourceConnection, rows, numRows, objTable, intTable, cb) {
   var arrRows = []
   for (var intRows = 0; intRows < rows.length; intRows++) {
     var objRow = rows[intRows]
-    arrCols = []
+    var arrCols = []
     for (var intCols = 0; intCols < objTable.columns.length; intCols++) {
       var strColumnName = objTable.columns[intCols].name
       var objColumnValue = objRow[strColumnName]
@@ -403,10 +403,10 @@ function databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, obj
           return (objMySQLConnection.escape(objColumnValue))
         }) + ')')
       })
-      var strSQLInsertValues = objTable.sql_insert + ' VALUES \n'
-        + arrSQLValues.join(', \n') + '\n'
+      var strSQLInsertValues = objTable.sql_insert + ' VALUES \n' +
+        arrSQLValues.join(', \n') + '\n'
       console.log('MySQL[' + arrRows.length + ']: ' + strSQLInsertValues)
-      objMySQLConnection.query({sql:strSQLInsertValues, timeout:intTimeout}, null, function (err, results, fields) {
+      objMySQLConnection.query({sql: strSQLInsertValues, timeout: intTimeout}, null, function (err, results, fields) {
         objMySQLConnection.release()
         if (err) {
           throw err
