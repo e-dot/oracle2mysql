@@ -14,10 +14,14 @@ This simple script converts data from an Oracle database to a MySQL database :
 * Database requirements:
   * Requires a connection to an Oracle Database (via oracle-db npm package)
   * Requires a connection to a MySQL Database (via mysql npm package)
+* Reads data from Oracle and writes it to MySQL using SQL commands
 * Data type conversion:
-  * TODO
-* Command line parameters:
-  * TODO
+  * VARCHAR2 => VARCHAR
+  * DATE => DATE
+  * CLOB => LONGTEXT
+  * BLOB => LONGBLOB
+  * NUMBER => INTEGER or DECIMAL(...)
+* Multiple command line parameters to adapt migration for your needs
 
   
 ## Setup
