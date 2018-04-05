@@ -46,6 +46,7 @@ var async = require('async')
 oracleDB.fetchAsBuffer = [ oracleDB.BLOB ]
 
 var mysqlDBConnectionPool = mysql.createPool({
+  connectionLimit : 100,
   host: mysqlDBConfig.host,
   user: mysqlDBConfig.user,
   password: mysqlDBConfig.password,
@@ -303,7 +304,7 @@ function databaseCreateTable (objTable, intTable, cb) {
       throw err
     }
     console.log('MySQL: ' + objTable.sql_create)
-    objMySQLConnection.query(objTable.sql_create, null, function (err, results, fields) {
+    objMySQLConnection.query({sql: objTable.sql_create, timeout: intTimeout*1000}, null, function (err, results, fields) {
       objMySQLConnection.release()
       if (err) {
         throw err
@@ -357,17 +358,24 @@ function databaseSelectInsertFetchRows (objSourceConnection, resultSet, numRows,
         oracleDBRelease(objSourceConnection)
         throw err
       } else if (rows.length > 0) {     // got some rows
-        databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, cb)
-        if (rows.length === numRows) {
-          // might be more rows
-          databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, objTable, intTable, cb)
-        } else {
-          // got fewer rows than requested so must be at end
-          databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, cb)
-          // close the ResultSet and release the connection
-          resultSet.close()
-          oracleDBRelease(objSourceConnection)
-        }
+        databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, function (err) {
+          if (err) throw err
+          if (rows.length === numRows) {
+            // might be more rows
+            databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, objTable, intTable, function (err) {
+              if (err) throw err
+              // Execute callback/end of loop
+              return cb()
+            })
+          } else {
+            // got fewer rows than requested so must be at end
+            // close the ResultSet and release the connection
+            resultSet.close()
+            oracleDBRelease(objSourceConnection)
+            // Execute callback/end of loop
+            return cb()
+          }
+        })
       } else {
         // else no rows
         // close the ResultSet and release the connection
@@ -407,7 +415,7 @@ function databaseSelectInsertProcessRows (objSourceConnection, rows, numRows, ob
       var strSQLInsertValues = objTable.sql_insert + ' VALUES \n' +
         arrSQLValues.join(', \n') + '\n'
       console.log('MySQL[' + arrRows.length + ']: ' + strSQLInsertValues)
-      objMySQLConnection.query({sql: strSQLInsertValues, timeout: intTimeout}, null, function (err, results, fields) {
+      objMySQLConnection.query({sql: strSQLInsertValues, timeout: intTimeout*1000}, null, function (err, results, fields) {
         objMySQLConnection.release()
         if (err) {
           throw err
