@@ -75,7 +75,8 @@ This simple script converts data from an Oracle database to a MySQL database :
 
 ### How do I solve error "FATAL ERROR: CALL_AND_RETRY_LAST Allocation failed - process out of memory" ?
 
-* Use option --max_old_space_size when launching node, e.g. :
+* Use option <code>--max_old_space_size</code> when launching node, e.g. :
+
     node --max_old_space_size=2048 bin/oracle2mysql.js [options]
 
 ## References
