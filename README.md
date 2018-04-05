@@ -59,7 +59,8 @@ This simple script converts data from an Oracle database to a MySQL database :
 ### Command Line Options
 
 * -list_request : define the Oracle query to list all SQL tables for migration (defaults to <code>SELECT * FROM dba_tables</code>)
-  * -list_request "SELECT * FROM dba_tables WHERE OWNER = 'mylogin'" : list only tables owned by 'mylogin'
+  * -list_request "SELECT * FROM dba_tables WHERE OWNER = 'mylogin'" : process only tables owned by 'mylogin'
+  * -list_request "SELECT * FROM dba_tables WHERE OWNER = 'mylogin' AND TABLE_NAME='mytable'" : process only table 'mytable' owned by 'mylogin'
 * -schema_map : define the schema mapping from Oracle (owner) to MySQL (database) ; defaults to "*:*" (maps owner to database as-is)
   * -schema_map "*:MYBASE" : replace owner by 'mybase' (e.g. table OWNER.NAME is migrated into MYBASE.NAME)
 * -timeout : define the query timeout, in seconds (defaults to 600 s i.e. 10 minutes)
