@@ -2,7 +2,7 @@
 // Conversion batch from Oracle to MySQL
 //
 
-var strSQLOracleListTables = 'SELECT * FROM dba_tables'
+var strSQLOracleListTables = 'SELECT * FROM dba_tables ORDER BY OWNER,TABLE_NAME'
 var objSQLSchemaMap = {in: '*', out: '*'}
 var arrTables = []
 var intTimeout = 600 /* 10 minutes */
@@ -90,14 +90,18 @@ databaseLoop(function (err) {
       strSQLDropCreateTruncateTable += strSQLTruncateTable
     }
     // console.log('#' + intTable.toString(10) + ' SQL='+strSQLDropCreateTruncateTable)
-    var arrSQLColumns = objTable.columns.map(function (objColumn, intIndex, arrValues) {
+    var arrMySQLColumns = objTable.columns.map(function (objColumn, intIndex, arrValues) {
+      return ('`' + objColumn.name + '`')
+    })
+    var arrOracleColumns = objTable.columns.map(function (objColumn, intIndex, arrValues) {
       return (objColumn.name)
     })
-    var strSQLColumns = arrSQLColumns.join(', ')
+    var strMySQLColumns = arrMySQLColumns.join(', ')
+    var strOracleColumns = arrOracleColumns.join(', ')
     var strSQLSelectTable = 'SELECT ' +
-      strSQLColumns +
+      strOracleColumns +
       ' FROM ' + objTable.table_owner + '.' + objTable.table_name
-    var strSQLInsertIntoTable = 'INSERT INTO ' + objTable.mysql_schema + '.' + objTable.table_name + ' (\n  ' + strSQLColumns + '\n)\n'
+    var strSQLInsertIntoTable = 'INSERT INTO `' + objTable.mysql_schema + '`.`' + objTable.table_name + '` (\n  ' + strMySQLColumns + '\n)\n'
     objTable.sql_create = strSQLDropCreateTruncateTable
     objTable.sql_select = strSQLSelectTable
     objTable.sql_insert = strSQLInsertIntoTable
@@ -264,6 +268,21 @@ function databaseMapTable (objTable, intTableKey, cb) {
 function databaseMapDataType (strSourceDataType, intDataLength, intDataPrecision, intDataScale) {
   var strDestinationDataType = strSourceDataType
   switch (strSourceDataType) {
+    case 'CHAR':
+      if (intDataLength >255) {
+        if (intDataLength > 65535) {
+          if (intDataLength > 16777215) {
+            strDestinationDataType = 'LONGTEXT'
+          } else {
+            strDestinationDataType = 'MEDIUMTEXT'
+          }
+        } else {
+          strDestinationDataType = 'TEXT'
+        }
+      } else {
+        strDestinationDataType = 'CHAR(' + intDataLength + ')'
+      }
+      break
     case 'VARCHAR2':
       strDestinationDataType = 'VARCHAR(' + intDataLength + ')'
       break
@@ -275,6 +294,7 @@ function databaseMapDataType (strSourceDataType, intDataLength, intDataPrecision
       }
       break
     case 'CLOB':
+    case 'LONG':
       strDestinationDataType = 'LONGTEXT'
       break
     case 'BLOB':
