@@ -9,8 +9,9 @@ var intTimeout = 600 /* 10 minutes */
 var blnDrop = true
 var blnCreate = true
 var blnTruncate = false
+var blnVerbose = false
 var strMySQLTableEngine = 'MyISAM'
-var intSelectStep = 10000
+var intSelectStep = 1000
 
 // Process command line arguments
 for (var intIndex = 2; intIndex < process.argv.length; intIndex++) {
@@ -32,6 +33,8 @@ for (var intIndex = 2; intIndex < process.argv.length; intIndex++) {
     blnCreate = false
   } else if (strValue === '-truncate') {
     blnTruncate = true
+  } else if (strValue === '-verbose') {
+    blnVerbose = true
   } else if (strValue === '-engine') {
     strMySQLTableEngine = process.argv[++intIndex]
   } else if (strValue === '-step') {
@@ -227,7 +230,7 @@ function databaseMapTable (objTable, intTableKey, cb) {
         },
 
         {
-          maxRows: intSelectStep,
+          maxRows: 0,
           outFormat: oracleDB.OBJECT,  // query result format
           extendedMetaData: false,     // no extra metadata
           fetchArraySize: 10000        // internal buffer allocation size for tuning
@@ -326,7 +329,11 @@ function databaseCreateTable (objTable, intTable, cb) {
     if (err) {
       throw err
     }
-    console.log('MySQL: ' + objTable.sql_create)
+    if (blnVerbose) {
+      console.log('MySQL: ' + objTable.sql_create)
+    } else {
+      console.log('MySQL: CREATE TABLE ' + objTable.mysql_schema + '.' + objTable.table_name)
+    }
     objMySQLConnection.query({sql: objTable.sql_create, timeout: intTimeout*1000}, null, function (err, results, fields) {
       objMySQLConnection.release()
       if (err) {
@@ -342,7 +349,11 @@ function databaseSelectInsertTable (objTable, intTable, cb) {
     if (err) {
       throw err
     }
-    console.log('Oracle:' + objTable.sql_select)
+    if (blnVerbose) {
+      console.log('Oracle:' + objTable.sql_select)
+    } else {
+      console.log('Oracle: SELECT * FROM ' + objTable.table_owner + '.' + objTable.table_name)
+    }
     objSourceConnection.execute(
       // Loop on all rows in source table
       objTable.sql_select,
@@ -365,14 +376,14 @@ function databaseSelectInsertTable (objTable, intTable, cb) {
           oracleDBRelease(objSourceConnection)
           throw err
         }
-        var numRows = 100  // number of rows to return from each call to getRows()
-        databaseSelectInsertFetchRows(objSourceConnection, result.resultSet, numRows, objTable, intTable, cb)
+        var numRows = intSelectStep  // number of rows to return from each call to getRows()
+        databaseSelectInsertFetchRows(0, objSourceConnection, result.resultSet, numRows, objTable, intTable, cb)
       }
     )
   })
 }
 
-function databaseSelectInsertFetchRows (objSourceConnection, resultSet, numRows, objTable, intTable, cb) {
+function databaseSelectInsertFetchRows (intLoop, objSourceConnection, resultSet, numRows, objTable, intTable, cb) {
   resultSet.getRows( // get numRows rows
     numRows,
     function (err, rows) {
@@ -381,11 +392,11 @@ function databaseSelectInsertFetchRows (objSourceConnection, resultSet, numRows,
         oracleDBRelease(objSourceConnection)
         throw err
       } else if (rows.length > 0) {     // got some rows
-        databaseSelectInsertProcessRows(objSourceConnection, rows, numRows, objTable, intTable, function (err) {
+        databaseSelectInsertProcessRows(intLoop, objSourceConnection, rows, numRows, objTable, intTable, function (err) {
           if (err) throw err
           if (rows.length === numRows) {
             // might be more rows
-            databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, objTable, intTable, function (err) {
+            databaseSelectInsertFetchRows(intLoop+1, objSourceConnection, resultSet, numRows, objTable, intTable, function (err) {
               if (err) throw err
               // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
               return setTimeout(() => { cb(); });
@@ -411,7 +422,7 @@ function databaseSelectInsertFetchRows (objSourceConnection, resultSet, numRows,
   )
 }
 
-function databaseSelectInsertProcessRows (objSourceConnection, rows, numRows, objTable, intTable, cb) {
+function databaseSelectInsertProcessRows (intLoop, objSourceConnection, rows, numRows, objTable, intTable, cb) {
   var arrRows = []
   for (var intRows = 0; intRows < rows.length; intRows++) {
     var objRow = rows[intRows]
@@ -437,7 +448,11 @@ function databaseSelectInsertProcessRows (objSourceConnection, rows, numRows, ob
       })
       var strSQLInsertValues = objTable.sql_insert + ' VALUES \n' +
         arrSQLValues.join(', \n') + '\n'
-      console.log('MySQL[' + arrRows.length + ']: ' + strSQLInsertValues)
+      if (blnVerbose) {
+        console.log('MySQL[' + intLoop.toString(10) + ',' + arrRows.length.toString(10) + ']: ' + strSQLInsertValues)
+      } else {
+        console.log('MySQL[' + intLoop.toString(10) + ',' + arrRows.length.toString(10) + ']: INSERT INTO ' + objTable.mysql_schema + '.' + objTable.table_name)
+      }
       objMySQLConnection.query({sql: strSQLInsertValues, timeout: intTimeout*1000}, null, function (err, results, fields) {
         objMySQLConnection.release()
         if (err) {
