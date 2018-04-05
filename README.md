@@ -71,6 +71,13 @@ This simple script converts data from an Oracle database to a MySQL database :
 * -step: define the number of rows browsed and copied on every loop (defaults to 1 000)
   * -step 100000 : list 100 000 entries from source table at a time and create a single INSERT command into destination table (faster, but uses more resources)
 
+## FAQ
+
+### How do I solve error "FATAL ERROR: CALL_AND_RETRY_LAST Allocation failed - process out of memory" ?
+
+* Use option --max_old_space_size when launching node, e.g. :
+    node --max_old_space_size=2048 bin/oracle2mysql.js [options]
+
 ## References
 
 ### Oracle Data Types
