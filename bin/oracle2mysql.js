@@ -10,6 +10,7 @@ var blnDrop = true
 var blnCreate = true
 var blnTruncate = false
 var strMySQLTableEngine = 'MyISAM'
+var intSelectStep = 10000
 
 // Process command line arguments
 for (var intIndex = 2; intIndex < process.argv.length; intIndex++) {
@@ -33,6 +34,8 @@ for (var intIndex = 2; intIndex < process.argv.length; intIndex++) {
     blnTruncate = true
   } else if (strValue === '-engine') {
     strMySQLTableEngine = process.argv[++intIndex]
+  } else if (strValue === '-step') {
+    intSelectStep = parseInt(process.argv[++intIndex], 10)
   }
 }
 
@@ -46,7 +49,7 @@ var async = require('async')
 oracleDB.fetchAsBuffer = [ oracleDB.BLOB ]
 
 var mysqlDBConnectionPool = mysql.createPool({
-  connectionLimit : 100,
+  connectionLimit : 10,
   host: mysqlDBConfig.host,
   user: mysqlDBConfig.user,
   password: mysqlDBConfig.password,
@@ -220,10 +223,10 @@ function databaseMapTable (objTable, intTableKey, cb) {
         },
 
         {
-          maxRows: 1000,
+          maxRows: intSelectStep,
           outFormat: oracleDB.OBJECT,  // query result format
           extendedMetaData: false,     // no extra metadata
-          fetchArraySize: 1000         // internal buffer allocation size for tuning
+          fetchArraySize: 10000        // internal buffer allocation size for tuning
         },
 
         // Callback function
