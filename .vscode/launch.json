@@ -11,9 +11,9 @@
             "program": "${file}",
             "args": [
                 "-list_request",
-                "SELECT * FROM dba_tables WHERE OWNER = 'GREFFIER'",
+                "SELECT * FROM dba_tables",
                 "-schema_map",
-                "*:gagi2",
+                "*:*",
                 "-truncate"
             ],
             "outFiles": [

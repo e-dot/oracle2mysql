@@ -42,6 +42,9 @@ var oracleDB = require('oracledb')
 var oracleDBConfig = require('./oracleDBConfig.js')
 var async = require('async')
 
+// In order to process CLOB easily, process them as buffers
+oracleDB.fetchAsBuffer = [ oracleDB.BLOB ]
+
 var mysqlDBConnectionPool = mysql.createPool({
   host: mysqlDBConfig.host,
   user: mysqlDBConfig.user,
@@ -364,8 +367,6 @@ function databaseSelectInsertFetchRows (objSourceConnection, resultSet, numRows,
           // close the ResultSet and release the connection
           resultSet.close()
           oracleDBRelease(objSourceConnection)
-          // Execute callback/end of loop
-          return cb()
         }
       } else {
         // else no rows
@@ -411,6 +412,8 @@ function databaseSelectInsertProcessRows (objSourceConnection, rows, numRows, ob
         if (err) {
           throw err
         }
+        // Execute callback/end of loop
+        return cb()
       })
     })
   }
