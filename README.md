@@ -68,6 +68,8 @@ This simple script converts data from an Oracle database to a MySQL database :
 * -nocreate : if set, no "CREATE TABLE" will be executed during migration (you have to manually create tables first)
 * -truncate : if set, a SQL command "TRUNCATE TABLE" will be execute during migration of every table (emptying the table)
 * -engine: if set, all "CREATE TABLE" commands will use this ENGINE (defaults to "MyISAM")
+* -step: define the number of rows browsed and copied on every loop (defaults to 10 000)
+  * -step 100000 : list 100 000 entries from source table at a time and create a single INSERT command into destination table (faster, but uses more resources)
 
 ## References
 

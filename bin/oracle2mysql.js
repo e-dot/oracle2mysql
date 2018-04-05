@@ -367,16 +367,16 @@ function databaseSelectInsertFetchRows (objSourceConnection, resultSet, numRows,
             // might be more rows
             databaseSelectInsertFetchRows(objSourceConnection, resultSet, numRows, objTable, intTable, function (err) {
               if (err) throw err
-              // Execute callback/end of loop
-              return cb()
+              // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
+              return setTimeout(() => { cb(); });
             })
           } else {
             // got fewer rows than requested so must be at end
             // close the ResultSet and release the connection
             resultSet.close()
             oracleDBRelease(objSourceConnection)
-            // Execute callback/end of loop
-            return cb()
+            // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
+            return setTimeout(() => { cb(); });
           }
         })
       } else {
@@ -384,8 +384,8 @@ function databaseSelectInsertFetchRows (objSourceConnection, resultSet, numRows,
         // close the ResultSet and release the connection
         resultSet.close()
         oracleDBRelease(objSourceConnection)
-        // Execute callback/end of loop
-        return cb()
+        // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
+        return setTimeout(() => { cb(); });
       }
     }
   )
