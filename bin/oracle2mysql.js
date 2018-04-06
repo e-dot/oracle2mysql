@@ -52,7 +52,7 @@ var async = require('async')
 oracleDB.fetchAsBuffer = [ oracleDB.BLOB ]
 
 var mysqlDBConnectionPool = mysql.createPool({
-  connectionLimit : 10,
+  connectionLimit: 10,
   host: mysqlDBConfig.host,
   user: mysqlDBConfig.user,
   password: mysqlDBConfig.password,
@@ -272,7 +272,7 @@ function databaseMapDataType (strSourceDataType, intDataLength, intDataPrecision
   var strDestinationDataType = strSourceDataType
   switch (strSourceDataType) {
     case 'CHAR':
-      if (intDataLength >255) {
+      if (intDataLength > 255) {
         if (intDataLength > 65535) {
           if (intDataLength > 16777215) {
             strDestinationDataType = 'LONGTEXT'
@@ -334,7 +334,7 @@ function databaseCreateTable (objTable, intTable, cb) {
     } else {
       console.log('MySQL: CREATE TABLE ' + objTable.mysql_schema + '.' + objTable.table_name)
     }
-    objMySQLConnection.query({sql: objTable.sql_create, timeout: intTimeout*1000}, null, function (err, results, fields) {
+    objMySQLConnection.query({sql: objTable.sql_create, timeout: intTimeout * 1000}, null, function (err, results, fields) {
       objMySQLConnection.release()
       if (err) {
         throw err
@@ -396,10 +396,10 @@ function databaseSelectInsertFetchRows (intLoop, objSourceConnection, resultSet,
           if (err) throw err
           if (rows.length === numRows) {
             // might be more rows
-            databaseSelectInsertFetchRows(intLoop+1, objSourceConnection, resultSet, numRows, objTable, intTable, function (err) {
+            databaseSelectInsertFetchRows(intLoop + 1, objSourceConnection, resultSet, numRows, objTable, intTable, function (err) {
               if (err) throw err
               // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
-              return setTimeout(() => { cb(); });
+              return setTimeout(() => { cb() })
             })
           } else {
             // got fewer rows than requested so must be at end
@@ -407,7 +407,7 @@ function databaseSelectInsertFetchRows (intLoop, objSourceConnection, resultSet,
             resultSet.close()
             oracleDBRelease(objSourceConnection)
             // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
-            return setTimeout(() => { cb(); });
+            return setTimeout(() => { cb() })
           }
         })
       } else {
@@ -416,7 +416,7 @@ function databaseSelectInsertFetchRows (intLoop, objSourceConnection, resultSet,
         resultSet.close()
         oracleDBRelease(objSourceConnection)
         // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
-        return setTimeout(() => { cb(); });
+        return setTimeout(() => { cb() })
       }
     }
   )
@@ -453,7 +453,7 @@ function databaseSelectInsertProcessRows (intLoop, objSourceConnection, rows, nu
       } else {
         console.log('MySQL[' + intLoop.toString(10) + ',' + arrRows.length.toString(10) + ']: INSERT INTO ' + objTable.mysql_schema + '.' + objTable.table_name)
       }
-      objMySQLConnection.query({sql: strSQLInsertValues, timeout: intTimeout*1000}, null, function (err, results, fields) {
+      objMySQLConnection.query({sql: strSQLInsertValues, timeout: intTimeout * 1000}, null, function (err, results, fields) {
         objMySQLConnection.release()
         if (err) {
           throw err
