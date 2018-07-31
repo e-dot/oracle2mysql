@@ -301,6 +301,8 @@ function databaseMapDataType (strSourceDataType, intDataLength, intDataPrecision
       strDestinationDataType = 'LONGTEXT'
       break
     case 'BLOB':
+    case 'RAW':
+    case 'LONG RAW':
       strDestinationDataType = 'LONGBLOB'
       break
   }
@@ -318,6 +320,9 @@ function databaseMapDefault (objColumn) {
         // No direct translation from Oracle to MySQL: drop it
         strSQLDefault = ''
       }
+    } else if (objColumn.default.match(/empty_clob\(\)/i)) {
+      // MySQL's empty BLOB is NULL
+      strSQLDefault = ' DEFAULT NULL'
     }
   }
 
