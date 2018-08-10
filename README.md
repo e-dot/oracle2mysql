@@ -79,6 +79,13 @@ This simple script converts data from an Oracle database to a MySQL database :
 
     node --max_old_space_size=2048 bin/oracle2mysql.js [options]
 
+### Why are my DATETIME fields have a 1 day shift (D-1) ? How do I solve this jetlag issue ?
+
+* Set environment variable ORA_SDTZ before running node, e.g. on Windows:
+
+    SET ORA_SDTZ=Europe/Paris
+    node --max_old_space_size=2048 bin/oracle2mysql.js [options]
+
 ## References
 
 ### Oracle Data Types
@@ -88,4 +95,10 @@ This simple script converts data from an Oracle database to a MySQL database :
 ### MySQL Data Types
 
 * [https://dev.mysql.com/doc/refman/5.5/en/data-types.html]
+
+### Working with Dates Using the Node.js Driver for Oracle
+
+* [https://jsao.io/2016/09/working-with-dates-using-the-nodejs-driver/]
+
+
 
