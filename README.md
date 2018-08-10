@@ -84,6 +84,7 @@ This simple script converts data from an Oracle database to a MySQL database :
 * Set environment variable ORA_SDTZ before running node, e.g. on Windows:
 
     SET ORA_SDTZ=Europe/Paris
+
     node --max_old_space_size=2048 bin/oracle2mysql.js [options]
 
 ## References
