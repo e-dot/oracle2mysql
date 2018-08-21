@@ -89,6 +89,10 @@ This simple script converts data from an Oracle database to a MySQL database :
 
 ## References
 
+### Oracle Database Driver for Node.js
+
+* [https://github.com/oracle/node-oracledb]
+
 ### Oracle Data Types
 
 * [https://docs.oracle.com/cd/B28359_01/server.111/b28318/datatype.htm]
