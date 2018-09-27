@@ -8,7 +8,10 @@
             "type": "node",
             "request": "launch",
             "name": "Lancer le programme",
-            "program": "${file}",
+            "program": "${workspaceFolder}/bin/oracle2mysql.js",
+            "runtimeArgs": [
+                "--max_old_space_size=8192"
+            ],
             "args": [
                 "-list_request",
                 "SELECT * FROM dba_tables",
