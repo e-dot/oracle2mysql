@@ -3,6 +3,8 @@
 //
 
 var strSQLOracleListTables = 'SELECT * FROM dba_tables ORDER BY OWNER,TABLE_NAME'
+var strSQLOracleInitRequest = 'ALTER SESSION SET NLS_DATE_FORMAT=\'YYYY-MM-DD HH24:MI:SS\''
+var strSQLOracleSelectWhereClause = null
 var objSQLSchemaMap = {in: '*', out: '*'}
 var arrTables = []
 var intTimeout = 600 /* 10 minutes */
@@ -21,6 +23,10 @@ for (var intIndex = 2; intIndex < process.argv.length; intIndex++) {
     process.exit(0)
   } else if (strValue === '-list_request') {
     strSQLOracleListTables = process.argv[++intIndex]
+  } else if (strValue === '-oracle_init_request') {
+    strSQLOracleInitRequest = process.argv[++intIndex]
+  } else if (strValue === '-select_where_clause') {
+    strSQLOracleSelectWhereClause = process.argv[++intIndex]
   } else if (strValue === '-schema_map') {
     var arrSQLSchemaMap = process.argv[++intIndex].split(':')
     objSQLSchemaMap.in = arrSQLSchemaMap[0].toUpperCase()
@@ -62,7 +68,7 @@ var mysqlDBConnectionPool = mysql.createPool({
 console.log('Processing from Oracle 2 MySQL...')
 console.log('Connecting to Oracle database...')
 
-databaseLoop(function (err) {
+databaseInit(function (err) {
   if (err) {
     console.error(err.message)
     process.exit(1)
@@ -97,13 +103,13 @@ databaseLoop(function (err) {
       return ('`' + objColumn.name + '`')
     })
     var arrOracleColumns = objTable.columns.map(function (objColumn, intIndex, arrValues) {
-      return (objColumn.name)
+      return (oracleSelectColumn(objColumn, intIndex, arrValues))
     })
     var strMySQLColumns = arrMySQLColumns.join(', ')
     var strOracleColumns = arrOracleColumns.join(', ')
     var strSQLSelectTable = 'SELECT ' +
       strOracleColumns +
-      ' FROM ' + objTable.table_owner + '.' + objTable.table_name
+      ' FROM ' + objTable.table_owner + '.' + objTable.table_name + (strSQLOracleSelectWhereClause == null ? '' : ' ' + strSQLOracleSelectWhereClause)
     var strSQLInsertIntoTable = 'INSERT INTO `' + objTable.mysql_schema + '`.`' + objTable.table_name + '` (\n  ' + strMySQLColumns + '\n)\n'
     objTable.sql_create = strSQLDropCreateTruncateTable
     objTable.sql_select = strSQLSelectTable
@@ -132,7 +138,33 @@ databaseLoop(function (err) {
 
 function oracleDBConnect (cb) {
   var pool = oracleDB.getPool()
-  pool.getConnection(cb)
+
+  pool.getConnection(function (err, objSourceConnection) {
+    if (err) {
+      console.error(err.message)
+      if (objSourceConnection) {
+        oracleDBRelease(objSourceConnection)
+      }
+      return (cb(err, null))
+    }
+    // Execute init statement, if any
+    if (strSQLOracleInitRequest !== '' && strSQLOracleInitRequest != null) {
+      console.log('Oracle: ' + strSQLOracleInitRequest)
+      objSourceConnection.execute(strSQLOracleInitRequest, function (err, result) {
+        if (err) {
+          console.error(err.message)
+          if (objSourceConnection) {
+            oracleDBRelease(objSourceConnection)
+          }
+          return (cb(err, null))
+        }
+        return cb(err, objSourceConnection)
+      })
+    } else {
+      // No init statement, execute callback
+      return cb(err, objSourceConnection)
+    }
+  })
 }
 
 function oracleDBRelease (objSourceConnection) {
@@ -145,8 +177,7 @@ function oracleDBRelease (objSourceConnection) {
   )
 }
 
-function databaseLoop (cb) {
-  console.log('Oracle: ' + strSQLOracleListTables)
+function databaseInit (fnCallback) {
   oracleDB.createPool(
     {
       user: oracleDBConfig.user,
@@ -163,52 +194,86 @@ function databaseLoop (cb) {
           if (err) {
             console.error(err.message)
             console.error('Check environment variables NODE_ORACLEDB_USER, NODE_ORACLEDB_PASSWORD, NODE_ORACLEDB_CONNECTIONSTRING and NODE_ORACLEDB_EXTERNALAUTH.')
-            return (cb(err))
+            if (objSourceConnection) {
+              oracleDBRelease(objSourceConnection)
+            }
+            return (fnCallback(err))
           }
-          objSourceConnection.execute(
-            // The statement to execute
-            strSQLOracleListTables,
-
-            // No parameter in SQL request
-            [],
-
-            // execute() options argument.  Since the query only returns one
-            // row, we can optimize memory usage by reducing the default
-            // maxRows value.  For the complete list of other options see
-            // the documentation.
-            {
-              maxRows: 0,
-              outFormat: oracleDB.OBJECT,  // query result format
-              extendedMetaData: false,      // get extra metadata
-              fetchArraySize: 1000         // internal buffer allocation size for tuning
-            },
-
-            // The callback function handles the SQL execution results
-            function (err, result) {
+          // Execute init statement, if any
+          if (strSQLOracleInitRequest !== '' && strSQLOracleInitRequest != null) {
+            console.log('Oracle: ' + strSQLOracleInitRequest)
+            objSourceConnection.execute(strSQLOracleInitRequest, function (err, result) {
               if (err) {
                 console.error(err.message)
-                oracleDBRelease(objSourceConnection)
-                return (cb(err))
-              }
-              for (var intRows = 0; intRows < result.rows.length; intRows++) {
-                var strTableOwner = result.rows[intRows].OWNER.toUpperCase()
-                var strTableName = result.rows[intRows].TABLE_NAME.toUpperCase()
-                var strTablespace = result.rows[intRows].TABLESPACE_NAME.toUpperCase()
-                var strMySQLSchema = strTableOwner
-                if (objSQLSchemaMap.out !== '*') {
-                  strMySQLSchema = objSQLSchemaMap.out
+                if (objSourceConnection) {
+                  oracleDBRelease(objSourceConnection)
                 }
-                arrTables.push({table_owner: strTableOwner, table_name: strTableName, table_space: strTablespace, mysql_schema: strMySQLSchema})
+                return (fnCallback(err))
               }
-              oracleDBRelease(objSourceConnection)
-
-              async.eachOfLimit(arrTables, 3 /* limit */, databaseMapTable /* iteratee */, cb /* callbackopt */)
-            }
-          )
+              return databaseLoop(objSourceConnection, fnCallback)
+            })
+          } else {
+            return databaseLoop(objSourceConnection, fnCallback)
+          }
         }
       )
     }
   )
+}
+
+function databaseLoop (objSourceConnection, cb) {
+  console.log('Oracle: ' + strSQLOracleListTables)
+  objSourceConnection.execute(
+    // The statement to execute
+    strSQLOracleListTables,
+
+    // No parameter in SQL request
+    [],
+
+    // execute() options argument.  Since the query only returns one
+    // row, we can optimize memory usage by reducing the default
+    // maxRows value.  For the complete list of other options see
+    // the documentation.
+    {
+      maxRows: 0,
+      outFormat: oracleDB.OBJECT,  // query result format
+      extendedMetaData: false,      // get extra metadata
+      fetchArraySize: 1000         // internal buffer allocation size for tuning
+    },
+
+    // The callback function handles the SQL execution results
+    function (err, result) {
+      if (err) {
+        console.error(err.message)
+        oracleDBRelease(objSourceConnection)
+        return (cb(err))
+      }
+      for (var intRows = 0; intRows < result.rows.length; intRows++) {
+        var strTableOwner = result.rows[intRows].OWNER.toUpperCase()
+        var strTableName = result.rows[intRows].TABLE_NAME.toUpperCase()
+        var strTablespace = result.rows[intRows].TABLESPACE_NAME.toUpperCase()
+        var strMySQLSchema = strTableOwner
+        if (objSQLSchemaMap.out !== '*') {
+          strMySQLSchema = objSQLSchemaMap.out
+        }
+        arrTables.push({table_owner: strTableOwner, table_name: strTableName, table_space: strTablespace, mysql_schema: strMySQLSchema})
+      }
+      oracleDBRelease(objSourceConnection)
+
+      async.eachOfLimit(arrTables, 3 /* limit */, databaseMapTable /* iteratee */, cb /* callbackopt */)
+    }
+  )
+}
+
+// Build a SQL Select clause/value to read from source table
+function oracleSelectColumn (objColumn, intIndex, arrValues) {
+  // Default: simply use column name to read its value
+  var strSelectColumn = objColumn.name
+  if (objColumn.type === 'DATE') {
+    // Explicitly convert dates to string then date again (workaround old style dates with only 6 digits, e.g. 04-01-06)
+    strSelectColumn = 'TO_CHAR(' + objColumn.name + ',\'YYYY-MM-DD\') AS ' + objColumn.name
+  }
+  return (strSelectColumn)
 }
 
 function databaseMapTable (objTable, intTableKey, cb) {
@@ -293,7 +358,7 @@ function databaseMapDataType (strSourceDataType, intDataLength, intDataPrecision
       if (intDataScale > 0) {
         strDestinationDataType = 'DECIMAL(' + intDataLength.toString(10) + ',' + intDataScale.toString(10) + ')'
       } else {
-        strDestinationDataType = 'INTEGER'
+        strDestinationDataType = 'BIGINT'
       }
       break
     case 'CLOB':
@@ -393,9 +458,13 @@ function databaseSelectInsertFetchRows (intLoop, objSourceConnection, resultSet,
     numRows,
     function (err, rows) {
       if (err) {
-        resultSet.close()
-        oracleDBRelease(objSourceConnection)
-        throw err
+        resultSet.close(function (error) {
+          if (error) {
+            console.error(error.message)
+          }
+          oracleDBRelease(objSourceConnection)
+          throw err
+        })
       } else if (rows.length > 0) {     // got some rows
         databaseSelectInsertProcessRows(intLoop, objSourceConnection, rows, numRows, objTable, intTable, function (err) {
           if (err) throw err
@@ -409,8 +478,12 @@ function databaseSelectInsertFetchRows (intLoop, objSourceConnection, resultSet,
           } else {
             // got fewer rows than requested so must be at end
             // close the ResultSet and release the connection
-            resultSet.close()
-            oracleDBRelease(objSourceConnection)
+            resultSet.close(function (error) {
+              if (error) {
+                console.error(error.message)
+              }
+              oracleDBRelease(objSourceConnection)
+            })
             // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
             return setTimeout(() => { cb() })
           }
@@ -418,8 +491,12 @@ function databaseSelectInsertFetchRows (intLoop, objSourceConnection, resultSet,
       } else {
         // else no rows
         // close the ResultSet and release the connection
-        resultSet.close()
-        oracleDBRelease(objSourceConnection)
+        resultSet.close(function (error) {
+          if (error) {
+            console.error(error.message)
+          }
+          oracleDBRelease(objSourceConnection)
+        })
         // Execute callback/end of loop (WARNING: in order to avoid crash "Maximum call stack size exceeded" we use setTimeout to wrap our cb call)
         return setTimeout(() => { cb() })
       }
